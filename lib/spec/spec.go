@@ -2,73 +2,63 @@ package spec
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"sort"
 	"strconv"
-	"strings"
-	"sync"
+
+	"github.com/mar-tina/iso8583/lib/store"
 )
 
-type entry struct {
-	value  string
-	bitmap string
-}
-
-var signatureStore = struct {
-	sync.RWMutex
-	m map[string]entry
-}{m: make(map[string]entry)}
-
-func put(key string, value entry) {
-	log.Printf("put: %s, %v", key, value)
-	signatureStore.Lock()
-	signatureStore.m[key] = value
-	signatureStore.Unlock()
-}
-
-func get(key string) (entry, bool) {
-	val, ok := signatureStore.m[key]
-	return val, ok
-}
-
-type Iso8583 interface {
-}
-
-func getFieldNum(tags reflect.StructTag, key string) (int, bool) {
-	f := tags.Get(key)
-	val, err := strconv.Atoi(f)
-	if err != nil {
-		return 0, false
+//info fmt as below
+//field:len:encoding
+func getFieldInfoFromTag(field reflect.StructField) (int, string, error) {
+	tags := field.Tag
+	info := ""
+	lookup := []string{"field", "ln"}
+	//must have
+	fieldId, ok := tags.Lookup("field")
+	if !ok {
+		return 0, "", errors.New("missing required tag field")
 	}
 
-	return val, true
+	fieldIdNum, err := strconv.Atoi(fieldId)
+	if err != nil {
+		return 0, "", errors.New("unusable formate for tag field")
+	}
+
+	for i, key := range lookup {
+		val, ok := tags.Lookup(key)
+		sep := ""
+		if i < len(lookup)-1 {
+			sep = ":"
+		}
+		if ok {
+			info += fmt.Sprintf("%v", val) + sep
+		}
+	}
+	return fieldIdNum, info, nil
 }
 
 func Register(definitons ...interface{}) error {
 	for i := 0; i < len(definitons); i++ {
-		defn := definitons[i]
-		fields := reflect.TypeOf(defn)
+		fields := reflect.TypeOf(definitons[i])
 		secondaryBitmapFields := []int{}
 		primaryBitmapFields := []int{}
-		defname := fields.Name()
-		buildStr := ""
+		specstr := ""
 
 		for i := 0; i < fields.NumField(); i++ {
-			tags := fields.Field(i).Tag
-			fLen, okfLen := getFieldNum(tags, "ln")
-			fieldNum, okfNum := getFieldNum(tags, "field")
-			if !okfLen || !okfNum {
-				return fmt.Errorf("invalid field tag for: %s", fields.Field(i).Name)
+			fieldNum, fieldInfo, err := getFieldInfoFromTag(fields.Field(i))
+			if err != nil {
+				return err
 			}
 			if fieldNum > 68 {
 				secondaryBitmapFields = append(secondaryBitmapFields, fieldNum)
 			} else {
 				primaryBitmapFields = append(primaryBitmapFields, fieldNum)
 			}
-
-			buildStr += " " + fmt.Sprintf("%d", fieldNum) + ":" + fmt.Sprintf("%d", fLen)
+			specstr += " " + fieldInfo
 		}
 
 		buildMap := ""
@@ -76,18 +66,13 @@ func Register(definitons ...interface{}) error {
 		if len(secondaryBitmapFields) > 0 {
 			p := buildBitMap(primaryBitmapFields, true, true)
 			buildMap += p
-
 			s := buildBitMap(secondaryBitmapFields, false, false)
 			buildMap += s
-
 		} else {
 			p := buildBitMap(primaryBitmapFields, false, true)
 			buildMap += p
 		}
-		put(defname, entry{
-			value:  buildStr,
-			bitmap: buildMap,
-		})
+		store.Put(fields.Name(), specstr, buildMap)
 	}
 
 	return nil
@@ -130,44 +115,4 @@ func parseBinToHex(s string) string {
 	}
 
 	return fmt.Sprintf("%x", bin)
-}
-
-func PackMsg[K Iso8583](payload K) (string, error) {
-	defn := reflect.TypeOf(payload)
-	defVals := reflect.ValueOf(payload)
-	sig, ok := get(defn.Name())
-	if !ok {
-		return "", fmt.Errorf("unregistered struct: %s", defn.Name())
-	}
-
-	message := sig.value
-	mti := defVals.FieldByName("Mti")
-	if mti.String() == "" {
-		return "", fmt.Errorf("required field Mti is missing")
-	}
-
-	for i := 0; i < defn.NumField(); i++ {
-		msg, err := buildmsg(message, sig.bitmap, defn.Field(i).Tag.Get("field"), defn.Field(i).Tag.Get("ln"), defVals.Field(i).String())
-		if err != nil {
-			return "", err
-		}
-		message = msg
-	}
-
-	return strings.ReplaceAll(message, " ", ""), nil
-}
-
-func buildmsg(sig, bmap string, key, length, value string) (string, error) {
-	ln, err := strconv.Atoi(length)
-	if err != nil {
-		return "", fmt.Errorf("failed to convert len to decimal: %s", err)
-	}
-	if key == "0" {
-		value += bmap
-	}
-	return strings.Replace(sig, key+":"+length, value, ln), nil
-}
-
-func PackNetMsg() {
-
 }
