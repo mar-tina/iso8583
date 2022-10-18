@@ -2,98 +2,82 @@ package spec
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"sort"
 	"strconv"
-	"sync"
+
+	"github.com/mar-tina/iso8583/lib/store"
 )
 
-type fieldMapping struct {
-	Field     int
-	Fieldname string
-	Len       int
-	Pos       int
-	Value     string
+//info fmt as below
+//field:len:encoding
+func getFieldInfoFromTag(field reflect.StructField) (int, string, error) {
+	tags := field.Tag
+	info := ""
+	lookup := []string{"field", "ln"}
+	//must have
+	fieldId, ok := tags.Lookup("field")
+	if !ok {
+		return 0, "", errors.New("missing required tag field")
+	}
+
+	fieldIdNum, err := strconv.Atoi(fieldId)
+	if err != nil {
+		return 0, "", errors.New("unusable formate for tag field")
+	}
+
+	for i, key := range lookup {
+		val, ok := tags.Lookup(key)
+		sep := ""
+		if i < len(lookup)-1 {
+			sep = ":"
+		}
+		if ok {
+			info += fmt.Sprintf("%v", val) + sep
+		}
+	}
+	return fieldIdNum, info, nil
 }
 
-var signatureStore = struct {
-	sync.RWMutex
-	m map[string]fieldMapping
-}{m: make(map[string]fieldMapping)}
-
-// func put(key string, value fieldMapping) {
-// 	signatureStore.Lock()
-// 	signatureStore.m[key] = value
-// }
-
-type Iso8583 interface {
-}
-
-func Register[K Iso8583](definitons ...K) error {
-	for _, defn := range definitons {
-		fields := reflect.TypeOf(defn)
+func Register(definitons ...interface{}) error {
+	for i := 0; i < len(definitons); i++ {
+		fields := reflect.TypeOf(definitons[i])
 		secondaryBitmapFields := []int{}
 		primaryBitmapFields := []int{}
-		allFields := []fieldMapping{}
+		specstr := ""
 
 		for i := 0; i < fields.NumField(); i++ {
-			tags := fields.Field(i).Tag
-			fieldLen := tags.Get("ln")
-			fieldTag := tags.Get("field")
-			fieldLenNum, err1 := strconv.Atoi(fieldLen)
-			fieldTagNum, err := strconv.Atoi(fieldTag)
-			if err != nil || err1 != nil {
-				return fmt.Errorf("invalid field tag for: %s", fields.Field(i).Name)
+			fieldNum, fieldInfo, err := getFieldInfoFromTag(fields.Field(i))
+			if err != nil {
+				return err
 			}
-
-			if fieldTagNum > 68 {
-				secondaryBitmapFields = append(secondaryBitmapFields, fieldTagNum)
+			if fieldNum > 68 {
+				secondaryBitmapFields = append(secondaryBitmapFields, fieldNum)
 			} else {
-				primaryBitmapFields = append(primaryBitmapFields, fieldTagNum)
+				primaryBitmapFields = append(primaryBitmapFields, fieldNum)
 			}
-
-			allFields = append(allFields, fieldMapping{
-				Pos:       i,
-				Len:       fieldLenNum,
-				Fieldname: tags.Get("json"),
-				Field:     fieldTagNum,
-			})
+			specstr += " " + fieldInfo
 		}
 
+		buildMap := ""
 		// build primary bitmap
 		if len(secondaryBitmapFields) > 0 {
-			primary := buildBitMap(primaryBitmapFields, true, true)
-			allFields = append(allFields, fieldMapping{
-				Field: 1,
-				Len:   16,
-				Value: primary,
-				Pos:   1,
-			})
-			secodary := buildBitMap(secondaryBitmapFields, false, false)
-			allFields = append(allFields, fieldMapping{
-				Field: 1,
-				Len:   16,
-				Value: secodary,
-				Pos:   2,
-			})
-
+			p := buildBitMap(primaryBitmapFields, true, true)
+			buildMap += p
+			s := buildBitMap(secondaryBitmapFields, false, false)
+			buildMap += s
 		} else {
-			primary := buildBitMap(primaryBitmapFields, false, true)
-			allFields = append(allFields, fieldMapping{
-				Field: 1,
-				Len:   16,
-				Value: primary,
-				Pos:   1,
-			})
+			p := buildBitMap(primaryBitmapFields, false, true)
+			buildMap += p
 		}
+		store.Put(fields.Name(), specstr, buildMap)
 	}
 
 	return nil
 }
 
-// initialSetToOne defautls to the initial bitmap field is set to '1'
 func buildBitMap(fields []int, isPrimary, initialSetToOne bool) string {
 	var bitmap = ""
 	sort.Ints(fields)
@@ -102,14 +86,12 @@ func buildBitMap(fields []int, isPrimary, initialSetToOne bool) string {
 	if initialSetToOne {
 		bitmap += "1"
 	}
-	if !isPrimary {
-		bitmap += "0"
-	}
 
 	for _, field := range fields {
 		if !isPrimary {
 			field -= 68
 		}
+
 		if field > 0 {
 			zeroes := bytes.Repeat(zeroed, field)
 			currenBitmapLength := len(bitmap) + 1
@@ -127,18 +109,10 @@ func buildBitMap(fields []int, isPrimary, initialSetToOne bool) string {
 }
 
 func parseBinToHex(s string) string {
-	ui, err := strconv.ParseUint(s, 2, 64)
+	bin, err := strconv.ParseUint(s, 2, 64)
 	if err != nil {
 		return "error"
 	}
 
-	return fmt.Sprintf("%x", ui)
-}
-
-func PackMsg(defn interface{}) {
-	log.Printf("defn: %v", defn)
-}
-
-func PackNetMsg() {
-
+	return fmt.Sprintf("%x", bin)
 }
