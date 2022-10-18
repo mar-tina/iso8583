@@ -1,7 +1,6 @@
 package store
 
 import (
-	"log"
 	"sync"
 )
 
@@ -16,7 +15,6 @@ var signatureStore = struct {
 }{m: make(map[string]entry)}
 
 func Put(key string, value, bitmap string) {
-	log.Printf("put: %s, %v", key, value)
 	signatureStore.Lock()
 	signatureStore.m[key] = entry{
 		value:  value,
