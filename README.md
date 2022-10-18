@@ -22,8 +22,7 @@ check information to and from ECHO
 This is a basic go struct with some tags to provide info about packing
 the message
 
-**TO NOTE*** 
-
+**TO NOTE**
 The message is will be packed in the order in which the struct fields are defined
 
 ```go
@@ -49,23 +48,22 @@ library stores an internal signature of your spec and matches it
 when you pack the msg.
 
 ```go
-   err := spec.Register(NetMgmtREQ{}, NetMgmtREQMod{})
-   if err != nil {
-       //handle error
-   }
+err := spec.Register(NetMgmtREQ{}, NetMgmtREQMod{})
+if err != nil {
+    //handle error
+}
 ```
 
 ### pack your msg
 
 ```go
-    ...
-    msg1, err := msg.PackMsg(netmgtREQ)
-	if err != nil {
-		//handle error
-	}
-    ...
-
-    //0800823a0000000000004000000000000000042009061390000109061304200420001
+...
+msg1, err := msg.PackMsg(netmgtREQ)
+if err != nil {
+    //handle error
+}
+...
+//0800823a0000000000004000000000000000042009061390000109061304200420001
 ```
 
 TODO: Add a description and encoding tag
