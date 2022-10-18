@@ -22,6 +22,10 @@ check information to and from ECHO
 This is a basic go struct with some tags to provide info about packing
 the message
 
+**TO NOTE*** 
+
+The message is will be packed in the order in which the struct fields are defined
+
 ```go
 type NetMgmtREQ struct {
 	Mti                  string `field:"0" ln:"4" json:"0"`
