@@ -19,8 +19,8 @@ import (
 
 ### Field formats
 - ANS..16 – string including not more than 16 characters
-- LLVAR – field of variable length, the length is specified by two decimal digits at the beginning of the field
-- PLLVAR – field of variable length, the length is specified by two bytes at the beginning of the field
+- LLVAR – field of variable lngth, the lngth is specified by two decimal digits at the beginning of the field
+- PLLVAR – field of variable lngth, the lngth is specified by two bytes at the beginning of the field
 
 some examples below
 
@@ -40,13 +40,13 @@ The message is will be packed in the order in which the struct fields are define
 
 ```go
 type NetMgmtREQ struct {
-	Mti                  string `field:"0" len:"4" json:"0"`
-	TxnDateTime          string `field:"7" len:"10" json:"7"`
-	Stan                 string `field:"11" len:"19" lvar:"1" json:"11"`
-	LocalTransactionTime string `field:"12" len:"6" json:"12"`
-	LocalTransactionDate string `field:"13" len:"6" json:"13"`
-	SettlementDate       string `field:"15" len:"4" json:"15"`
-	NetMgmntInfoCode     string `field:"70" len:"10" json:"70"`
+	Mti                  string `field:"0" ln:"4" json:"0"`
+	TxnDateTime          string `field:"7" ln:"10" json:"7"`
+	Stan                 string `field:"11" ln:"19" json:"11"`
+	LocalTransactionTime string `field:"12" ln:"6" json:"12"`
+	LocalTransactionDate string `field:"13" ln:"6" json:"13"`
+	SettlementDate       string `field:"15" ln:"4" json:"15"`
+	NetMgmntInfoCode     string `field:"70" ln:"10" json:"70"`
 }
 ```
 
@@ -71,7 +71,7 @@ if err != nil {
 
 ```go
 ...
-msg1, err := msg.PackMSG(netmgtREQ)
+msg1, err := msg.PackMsg(netmgtREQ)
 if err != nil {
     //handle error
 }
@@ -92,3 +92,4 @@ Project is under active development
 - [ ] Network read
 - [ ] Testing 
 - [ ] Robust Fields
+
