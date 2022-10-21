@@ -3,7 +3,6 @@
 protocol which may used for passing credit card, debit card and/or 
 check information to and from ECHO
 
-
 ### How to use library
 
 ```
@@ -93,3 +92,5 @@ Project is under active development
 - [ ] Testing 
 - [ ] Robust Fields
 
+### Project info
+There is a [wiki](https://github.com/mar-tina/iso8583/wiki) being written actively and will be updated as time goes.
